@@ -1,66 +1,68 @@
-from contextlib import asynccontextmanager
 from pathlib import Path
+from contextlib import asynccontextmanager
 
 import joblib
-import pandas as pd
-
+import numpy as np
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
 
-MODEL_PATH = (
-    Path(__file__).parent
-    / "telecom_churn_pipeline.pkl"
-)
-
+MODEL_PATH = Path(__file__).parent / "telecom_churn_stack.pkl"
 model = None
 
+# Exact feature order used by the notebook:
+FEATURE_ORDER = [
+    "SeniorCitizen",
+    "Partner",
+    "Dependents",
+    "tenure",
+    "OnlineSecurity",
+    "OnlineBackup",
+    "DeviceProtection",
+    "TechSupport",
+    "Contract",
+    "PaperlessBilling",
+    "PaymentMethod",
+    "MonthlyCharges",
+    "TotalCharges",
+]
 
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    global model
+# LabelEncoder mappings reproduced from the notebook output.
+BINARY_MAP = {"No": 0, "Yes": 1}
 
-    if not MODEL_PATH.exists():
-        raise RuntimeError(
-            "telecom_churn_pipeline.pkl was not found."
-        )
+INTERNET_OPTION_MAP = {
+    "No": 0,
+    "No internet service": 1,
+    "Yes": 2,
+}
 
-    model = joblib.load(MODEL_PATH)
+CONTRACT_MAP = {
+    "Month-to-month": 0,
+    "One year": 1,
+    "Two year": 2,
+}
 
-    yield
+PAYMENT_METHOD_MAP = {
+    "Bank transfer (automatic)": 0,
+    "Credit card (automatic)": 1,
+    "Electronic check": 2,
+    "Mailed check": 3,
+}
 
-    model = None
-
-
-app = FastAPI(
-    title="Telecom Churn Prediction API",
-    description=(
-        "Predicts whether a telecom customer "
-        "is likely to churn."
-    ),
-    version="1.0.0",
-    lifespan=lifespan
-)
-
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=[
-        "http://127.0.0.1:5500",
-        "http://localhost:5500"
-    ],
-    allow_credentials=True,
-    allow_methods=["GET", "POST"],
-    allow_headers=["*"]
-)
+# Min and max values shown in the notebook before MinMaxScaler.
+SCALING = {
+    "tenure": (0.0, 72.0),
+    "MonthlyCharges": (18.25, 118.75),
+    "TotalCharges": (0.0, 8684.80),
+}
 
 
 class CustomerInput(BaseModel):
     SeniorCitizen: int = Field(ge=0, le=1)
     Partner: str
     Dependents: str
-    tenure: int = Field(ge=0)
+    tenure: float = Field(ge=0, le=72)
     OnlineSecurity: str
     OnlineBackup: str
     DeviceProtection: str
@@ -72,11 +74,94 @@ class CustomerInput(BaseModel):
     TotalCharges: float = Field(ge=0)
 
 
+def scale(value: float, minimum: float, maximum: float) -> float:
+    if maximum == minimum:
+        return 0.0
+    return (value - minimum) / (maximum - minimum)
+
+
+def require_mapping(value: str, mapping: dict[str, int], field: str) -> int:
+    if value not in mapping:
+        allowed = ", ".join(mapping.keys())
+        raise ValueError(f"{field} must be one of: {allowed}")
+    return mapping[value]
+
+
+def preprocess(customer: CustomerInput) -> np.ndarray:
+    values = {
+        "SeniorCitizen": customer.SeniorCitizen,
+        "Partner": require_mapping(customer.Partner, BINARY_MAP, "Partner"),
+        "Dependents": require_mapping(customer.Dependents, BINARY_MAP, "Dependents"),
+        "tenure": scale(customer.tenure, *SCALING["tenure"]),
+        "OnlineSecurity": require_mapping(
+            customer.OnlineSecurity, INTERNET_OPTION_MAP, "OnlineSecurity"
+        ),
+        "OnlineBackup": require_mapping(
+            customer.OnlineBackup, INTERNET_OPTION_MAP, "OnlineBackup"
+        ),
+        "DeviceProtection": require_mapping(
+            customer.DeviceProtection, INTERNET_OPTION_MAP, "DeviceProtection"
+        ),
+        "TechSupport": require_mapping(
+            customer.TechSupport, INTERNET_OPTION_MAP, "TechSupport"
+        ),
+        "Contract": require_mapping(customer.Contract, CONTRACT_MAP, "Contract"),
+        "PaperlessBilling": require_mapping(
+            customer.PaperlessBilling, BINARY_MAP, "PaperlessBilling"
+        ),
+        "PaymentMethod": require_mapping(
+            customer.PaymentMethod, PAYMENT_METHOD_MAP, "PaymentMethod"
+        ),
+        "MonthlyCharges": scale(
+            customer.MonthlyCharges, *SCALING["MonthlyCharges"]
+        ),
+        "TotalCharges": scale(customer.TotalCharges, *SCALING["TotalCharges"]),
+    }
+
+    return np.array([[values[name] for name in FEATURE_ORDER]], dtype=float)
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    global model
+
+    if not MODEL_PATH.exists():
+        raise RuntimeError(
+            "telecom_churn_stack.pkl is missing. "
+            "Run the export cell in the notebook first."
+        )
+
+    model = joblib.load(MODEL_PATH)
+    yield
+    model = None
+
+
+app = FastAPI(
+    title="Telecom Customer Churn API",
+    description="API for the stacking classifier trained in Telecom_churn(1).ipynb.",
+    version="1.0.0",
+    lifespan=lifespan,
+)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "http://127.0.0.1:5500",
+        "http://localhost:5500",
+    ],
+    allow_credentials=True,
+    allow_methods=["GET", "POST"],
+    allow_headers=["*"],
+)
+
+
 @app.get("/")
 def home():
     return {
-        "message": "Telecom churn API is running.",
-        "documentation": "/docs"
+        "message": "Telecom churn prediction API is running.",
+        "docs": "/docs",
+        "model": "StackingClassifier",
+        "features": FEATURE_ORDER,
     }
 
 
@@ -84,51 +169,43 @@ def home():
 def health():
     return {
         "status": "healthy",
-        "model_loaded": model is not None
+        "model_loaded": model is not None,
     }
 
 
 @app.post("/predict")
-def predict_churn(customer: CustomerInput):
+def predict(customer: CustomerInput):
     if model is None:
-        raise HTTPException(
-            status_code=503,
-            detail="The prediction model is unavailable."
-        )
+        raise HTTPException(status_code=503, detail="Model is not loaded.")
 
     try:
-        customer_df = pd.DataFrame(
-            [customer.model_dump()]
-        )
+        features = preprocess(customer)
+        prediction = int(model.predict(features)[0])
 
-        prediction = int(
-            model.predict(customer_df)[0]
-        )
-
-        probability = float(
-            model.predict_proba(customer_df)[0][1]
-        )
+        probability = None
+        if hasattr(model, "predict_proba"):
+            probability = float(model.predict_proba(features)[0][1])
 
         return {
             "prediction": prediction,
-            "churn": prediction == 1,
+            "churn": bool(prediction),
             "label": (
-                "Likely to churn"
+                "Customer is likely to churn"
                 if prediction == 1
-                else "Unlikely to churn"
+                else "Customer is unlikely to churn"
             ),
-            "churn_probability": round(
-                probability,
-                4
+            "churn_probability": (
+                round(probability, 4) if probability is not None else None
             ),
-            "churn_percentage": round(
-                probability * 100,
-                2
-            )
+            "churn_percentage": (
+                round(probability * 100, 2) if probability is not None else None
+            ),
         }
 
+    except ValueError as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error
     except Exception as error:
         raise HTTPException(
             status_code=500,
-            detail=f"Prediction failed: {error}"
+            detail=f"Prediction failed: {error}",
         ) from error
