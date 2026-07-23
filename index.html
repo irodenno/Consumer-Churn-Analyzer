@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ChurnGuard | Telecom Churn Prediction</title>
+  <style>
+    :root {
+      --navy: #0b1739;
+      --navy-2: #12234f;
+      --blue: #315efb;
+      --blue-soft: #edf2ff;
+      --cyan: #5eead4;
+      --green: #16a574;
+      --amber: #f59e0b;
+      --red: #e84b4b;
+      --ink: #15213d;
+      --muted: #6b7690;
+      --line: #e8ebf3;
+      --surface: #ffffff;
+      --page: #f6f8fc;
+      --shadow: 0 18px 48px rgba(22, 37, 80, .10);
+      --radius: 22px;
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: var(--ink);
+      background: var(--page);
+    }
+
+    button, input, select { font: inherit; }
+    button { cursor: pointer; }
+
+    .app { display: grid; grid-template-columns: 248px 1fr; min-height: 100vh; }
+    .sidebar {
+      position: sticky;
+      top: 0;
+      height: 100vh;
+      padding: 28px 20px;
+      color: #fff;
+      background:
+        radial-gradient(circle at 10% 10%, rgba(94,234,212,.20), transparent 23%),
+        linear-gradient(180deg, var(--navy-2), var(--navy));
+      display: flex;
+      flex-direction: column;
+    }
+
+    .brand { display: flex; gap: 12px; align-items: center; padding: 0 8px 28px; }
+    .brand-mark {
+      width: 42px; height: 42px; border-radius: 14px;
+      display: grid; place-items: center;
+      background: linear-gradient(135deg, var(--cyan), #89a7ff);
+      color: var(--navy); font-weight: 900;
+      box-shadow: 0 10px 26px rgba(94,234,212,.22);
+    }
+    .brand strong { display: block; font-size: 17px; }
+    .brand span { display: block; color: #aebadc; font-size: 12px; margin-top: 2px; }
+
+    .nav { display: grid; gap: 8px; }
+    .nav-item {
+      border: 0; color: #b9c4e3; background: transparent;
+      border-radius: 13px; padding: 13px 14px;
+      display: flex; align-items: center; gap: 12px; text-align: left;
+    }
+    .nav-item:hover, .nav-item.active { color: #fff; background: rgba(255,255,255,.10); }
+    .nav-item.active { box-shadow: inset 3px 0 0 var(--cyan); }
+    .nav-icon { width: 22px; text-align: center; }
+
+    .model-card {
+      margin-top: auto; padding: 16px; border: 1px solid rgba(255,255,255,.12);
+      border-radius: 16px; background: rgba(255,255,255,.06);
+    }
+    .model-card small { color: #aebadc; }
+    .model-card strong { display: block; margin: 6px 0; }
+    .model-card .dot { width: 8px; height: 8px; display: inline-block; border-radius: 50%; background: var(--cyan); margin-right: 7px; }
+
+    main { min-width: 0; }
+    .topbar {
+      height: 82px; padding: 0 34px; background: rgba(255,255,255,.86);
+      backdrop-filter: blur(16px); border-bottom: 1px solid var(--line);
+      display: flex; align-items: center; justify-content: space-between;
+      position: sticky; top: 0; z-index: 20;
+    }
+    .topbar h1 { font-size: 20px; margin: 0; }
+    .topbar p { margin: 4px 0 0; font-size: 13px; color: var(--muted); }
+    .user { display: flex; align-items: center; gap: 10px; }
+    .avatar { width: 38px; height: 38px; border-radius: 50%; display: grid; place-items: center; background: var(--blue-soft); color: var(--blue); font-weight: 800; }
+
+    .content { padding: 30px 34px 48px; max-width: 1500px; margin: 0 auto; }
+    .hero {
+      position: relative; overflow: hidden;
+      padding: 28px 30px; border-radius: var(--radius); color: #fff;
+      background: linear-gradient(115deg, #122451 0%, #2444a6 65%, #315efb 100%);
+      box-shadow: var(--shadow);
+      display: flex; align-items: center; justify-content: space-between; gap: 20px;
+    }
+    .hero::after { content: ""; width: 230px; height: 230px; border: 36px solid rgba(94,234,212,.15); border-radius: 50%; position: absolute; right: -55px; top: -98px; }
+    .hero h2 { font-size: clamp(24px, 3vw, 36px); margin: 0 0 9px; }
+    .hero p { max-width: 700px; color: #d8e1ff; margin: 0; line-height: 1.6; }
+    .hero-badge { position: relative; z-index: 2; white-space: nowrap; background: rgba(255,255,255,.12); border: 1px solid rgba(255,255,255,.18); padding: 10px 14px; border-radius: 999px; font-size: 13px; }
+
+    .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin: 20px 0; }
+    .stat { background: var(--surface); padding: 19px; border: 1px solid var(--line); border-radius: 17px; box-shadow: 0 8px 24px rgba(22,37,80,.045); }
+    .stat-label { color: var(--muted); font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; }
+    .stat-value { font-size: 25px; font-weight: 800; margin: 7px 0 2px; }
+    .stat-note { color: var(--muted); font-size: 12px; }
+
+    .workspace { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(310px, .75fr); gap: 20px; align-items: start; }
+    .panel { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: 0 12px 32px rgba(22,37,80,.055); }
+    .panel-header { padding: 22px 24px; border-bottom: 1px solid var(--line); display: flex; align-items: center; justify-content: space-between; gap: 14px; }
+    .panel-header h3 { margin: 0; font-size: 18px; }
+    .panel-header p { margin: 5px 0 0; font-size: 13px; color: var(--muted); }
+    .step { border-radius: 999px; background: var(--blue-soft); color: var(--blue); font-weight: 800; padding: 7px 11px; font-size: 12px; }
+    .panel-body { padding: 24px; }
+
+    .section-title { margin: 3px 0 14px; display: flex; gap: 9px; align-items: center; font-size: 14px; }
+    .section-title span { width: 26px; height: 26px; border-radius: 8px; display: grid; place-items: center; color: var(--blue); background: var(--blue-soft); }
+    .form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 15px; margin-bottom: 22px; }
+    .field.full { grid-column: 1 / -1; }
+    label { display: block; margin: 0 0 7px; font-size: 12px; font-weight: 750; color: #44506a; }
+    select, input {
+      width: 100%; border: 1px solid #dfe4ef; background: #fbfcff; color: var(--ink);
+      border-radius: 12px; padding: 12px 13px; outline: none; transition: .2s;
+    }
+    select:focus, input:focus { border-color: var(--blue); box-shadow: 0 0 0 4px rgba(49,94,251,.10); background: #fff; }
+    .range-row { display: grid; grid-template-columns: 1fr 78px; align-items: center; gap: 10px; }
+    input[type="range"] { padding: 0; accent-color: var(--blue); }
+    .actions { display: flex; justify-content: flex-end; gap: 10px; padding-top: 4px; }
+    .btn { border: 0; border-radius: 12px; padding: 12px 17px; font-weight: 800; }
+    .btn-secondary { color: #43506c; background: #eef1f7; }
+    .btn-primary { color: #fff; background: linear-gradient(135deg, #315efb, #2445bd); box-shadow: 0 10px 22px rgba(49,94,251,.24); }
+    .btn-primary:hover { transform: translateY(-1px); }
+
+    .result-panel { position: sticky; top: 103px; overflow: hidden; }
+    .result-top { padding: 26px; color: #fff; background: linear-gradient(145deg, var(--navy-2), var(--navy)); }
+    .result-top small { color: #b9c4e3; }
+    .risk-gauge { width: 176px; height: 92px; margin: 24px auto 4px; position: relative; overflow: hidden; }
+    .gauge-bg, .gauge-fill { position: absolute; width: 176px; height: 176px; border-radius: 50%; border: 17px solid; left: 0; top: 0; transform: rotate(45deg); }
+    .gauge-bg { border-color: rgba(255,255,255,.13); }
+    .gauge-fill { border-color: var(--cyan) var(--cyan) transparent transparent; transform: rotate(45deg); transition: transform .6s ease, border-color .3s ease; }
+    .gauge-value { position: absolute; left: 0; right: 0; bottom: 0; text-align: center; font-size: 32px; font-weight: 900; }
+    .risk-label { text-align: center; font-weight: 800; margin-top: 7px; }
+    .result-content { padding: 22px; }
+    .recommendation { border: 1px solid var(--line); border-radius: 14px; padding: 15px; margin-bottom: 12px; }
+    .recommendation strong { display: block; margin-bottom: 5px; font-size: 14px; }
+    .recommendation p { color: var(--muted); font-size: 12px; line-height: 1.5; margin: 0; }
+    .factor-list { display: grid; gap: 10px; margin-top: 15px; }
+    .factor { display: flex; justify-content: space-between; align-items: center; gap: 10px; font-size: 12px; }
+    .tag { padding: 5px 8px; border-radius: 999px; font-weight: 800; background: #fff3df; color: #a45c00; }
+    .tag.good { background: #e9fbf4; color: #087653; }
+    .api-status { margin-top: 15px; padding: 11px 12px; border-radius: 12px; font-size: 12px; background: #f4f6fb; color: var(--muted); }
+
+    .toast { position: fixed; right: 24px; bottom: 24px; background: var(--navy); color: #fff; padding: 13px 16px; border-radius: 12px; box-shadow: var(--shadow); opacity: 0; transform: translateY(12px); pointer-events: none; transition: .25s; z-index: 99; }
+    .toast.show { opacity: 1; transform: translateY(0); }
+
+    @media (max-width: 1080px) {
+      .app { grid-template-columns: 82px 1fr; }
+      .sidebar { padding: 25px 12px; }
+      .brand div:last-child, .nav-label, .model-card { display: none; }
+      .brand { justify-content: center; padding-left: 0; padding-right: 0; }
+      .nav-item { justify-content: center; }
+      .workspace { grid-template-columns: 1fr; }
+      .result-panel { position: static; }
+      .stats { grid-template-columns: repeat(2, 1fr); }
+    }
+    @media (max-width: 680px) {
+      .app { display: block; }
+      .sidebar { display: none; }
+      .topbar { padding: 0 18px; }
+      .content { padding: 18px; }
+      .hero { padding: 24px 20px; align-items: flex-start; flex-direction: column; }
+      .stats, .form-grid { grid-template-columns: 1fr; }
+      .field.full { grid-column: auto; }
+      .panel-header, .panel-body { padding-left: 18px; padding-right: 18px; }
+    }
+  </style>
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="brand-mark">CG</div>
+      <div><strong>ChurnGuard</strong><span>Customer intelligence</span></div>
+    </div>
+    <nav class="nav" aria-label="Main navigation">
+      <button class="nav-item"><span class="nav-icon">▦</span><span class="nav-label">Overview</span></button>
+      <button class="nav-item active"><span class="nav-icon">◎</span><span class="nav-label">New prediction</span></button>
+      <button class="nav-item"><span class="nav-icon">◫</span><span class="nav-label">Customer records</span></button>
+      <button class="nav-item"><span class="nav-icon">↗</span><span class="nav-label">Model insights</span></button>
+    </nav>
+    <div class="model-card">
+      <small>Model status</small>
+      <strong><span class="dot"></span>Stacking model ready</strong>
+      <small>XGBoost · LightGBM · Random Forest · Decision Tree</small>
+    </div>
+  </aside>
+
+  <main>
+    <header class="topbar">
+      <div><h1>Customer churn workspace</h1><p>Predict risk and plan retention actions.</p></div>
+      <div class="user"><div class="avatar">JS</div><div><strong>Analyst</strong><p>Telecom team</p></div></div>
+    </header>
+
+    <div class="content">
+      <section class="hero">
+        <div><h2>Spot churn risk before customers leave.</h2><p>Enter a customer’s account, service, contract, and billing details to estimate churn risk using the stacked model developed in the notebook.</p></div>
+        <div class="hero-badge">● Model available</div>
+      </section>
+
+      <section class="stats" aria-label="Model summary">
+        <article class="stat"><div class="stat-label">Final accuracy</div><div class="stat-value">84%</div><div class="stat-note">Stacked classifier test result</div></article>
+        <article class="stat"><div class="stat-label">XGBoost CV AUC</div><div class="stat-value">90.42%</div><div class="stat-note">Repeated stratified validation</div></article>
+        <article class="stat"><div class="stat-label">Observed churn</div><div class="stat-value">26.54%</div><div class="stat-note">Before SMOTE balancing</div></article>
+        <article class="stat"><div class="stat-label">Input features</div><div class="stat-value">13</div><div class="stat-note">Matches final model matrix</div></article>
+      </section>
+
+      <section class="workspace">
+        <form class="panel" id="predictionForm">
+          <div class="panel-header"><div><h3>Customer profile</h3><p>Complete the fields used by the trained model.</p></div><span class="step">13 inputs</span></div>
+          <div class="panel-body">
+            <h4 class="section-title"><span>1</span> Account profile</h4>
+            <div class="form-grid">
+              <div class="field"><label for="SeniorCitizen">Senior citizen</label><select id="SeniorCitizen" name="SeniorCitizen"><option value="0">No</option><option value="1">Yes</option></select></div>
+              <div class="field"><label for="Partner">Has a partner</label><select id="Partner" name="Partner"><option>No</option><option>Yes</option></select></div>
+              <div class="field"><label for="Dependents">Has dependents</label><select id="Dependents" name="Dependents"><option>No</option><option>Yes</option></select></div>
+              <div class="field"><label for="tenure">Tenure in months</label><div class="range-row"><input id="tenureRange" type="range" min="0" max="72" value="12"><input id="tenure" name="tenure" type="number" min="0" max="72" value="12" required></div></div>
+            </div>
+
+            <h4 class="section-title"><span>2</span> Services and support</h4>
+            <div class="form-grid">
+              <div class="field"><label for="OnlineSecurity">Online security</label><select id="OnlineSecurity" name="OnlineSecurity"><option>No</option><option>Yes</option><option>No internet service</option></select></div>
+              <div class="field"><label for="OnlineBackup">Online backup</label><select id="OnlineBackup" name="OnlineBackup"><option>No</option><option>Yes</option><option>No internet service</option></select></div>
+              <div class="field"><label for="DeviceProtection">Device protection</label><select id="DeviceProtection" name="DeviceProtection"><option>No</option><option>Yes</option><option>No internet service</option></select></div>
+              <div class="field"><label for="TechSupport">Technical support</label><select id="TechSupport" name="TechSupport"><option>No</option><option>Yes</option><option>No internet service</option></select></div>
+            </div>
+
+            <h4 class="section-title"><span>3</span> Contract and billing</h4>
+            <div class="form-grid">
+              <div class="field"><label for="Contract">Contract type</label><select id="Contract" name="Contract"><option>Month-to-month</option><option>One year</option><option>Two year</option></select></div>
+              <div class="field"><label for="PaperlessBilling">Paperless billing</label><select id="PaperlessBilling" name="PaperlessBilling"><option>Yes</option><option>No</option></select></div>
+              <div class="field full"><label for="PaymentMethod">Payment method</label><select id="PaymentMethod" name="PaymentMethod"><option>Electronic check</option><option>Mailed check</option><option>Bank transfer (automatic)</option><option>Credit card (automatic)</option></select></div>
+              <div class="field"><label for="MonthlyCharges">Monthly charges ($)</label><input id="MonthlyCharges" name="MonthlyCharges" type="number" min="0" step="0.01" value="74.50" required></div>
+              <div class="field"><label for="TotalCharges">Total charges ($)</label><input id="TotalCharges" name="TotalCharges" type="number" min="0" step="0.01" value="894.00" required></div>
+            </div>
+
+            <div class="actions"><button type="reset" class="btn btn-secondary">Reset</button><button type="submit" class="btn btn-primary">Predict churn risk →</button></div>
+          </div>
+        </form>
+
+        <aside class="panel result-panel" aria-live="polite">
+          <div class="result-top">
+            <small>Current prediction</small>
+            <div class="risk-gauge"><div class="gauge-bg"></div><div class="gauge-fill" id="gaugeFill"></div><div class="gauge-value" id="riskValue">--</div></div>
+            <div class="risk-label" id="riskLabel">Enter customer details</div>
+          </div>
+          <div class="result-content">
+            <div class="recommendation"><strong id="actionTitle">Retention action</strong><p id="actionText">A recommended next step will appear after prediction.</p></div>
+            <strong style="font-size:13px">Primary risk signals</strong>
+            <div class="factor-list" id="factorList"><div class="factor"><span>No prediction yet</span><span class="tag good">Waiting</span></div></div>
+            <div class="api-status" id="apiStatus">Demo mode: the page will call <code>/predict</code> when an API is available, otherwise it shows a local UI estimate.</div>
+          </div>
+        </aside>
+      </section>
+    </div>
+  </main>
+</div>
+<div class="toast" id="toast">Prediction updated</div>
+<script>
+  const form = document.getElementById('predictionForm');
+  const tenure = document.getElementById('tenure');
+  const tenureRange = document.getElementById('tenureRange');
+  tenureRange.addEventListener('input', () => tenure.value = tenureRange.value);
+  tenure.addEventListener('input', () => tenureRange.value = Math.max(0, Math.min(72, Number(tenure.value || 0))));
+
+  function getPayload() {
+    const data = new FormData(form);
+    return {
+      SeniorCitizen: Number(data.get('SeniorCitizen')),
+      Partner: data.get('Partner'),
+      Dependents: data.get('Dependents'),
+      tenure: Number(data.get('tenure')),
+      OnlineSecurity: data.get('OnlineSecurity'),
+      OnlineBackup: data.get('OnlineBackup'),
+      DeviceProtection: data.get('DeviceProtection'),
+      TechSupport: data.get('TechSupport'),
+      Contract: data.get('Contract'),
+      PaperlessBilling: data.get('PaperlessBilling'),
+      PaymentMethod: data.get('PaymentMethod'),
+      MonthlyCharges: Number(data.get('MonthlyCharges')),
+      TotalCharges: Number(data.get('TotalCharges'))
+    };
+  }
+
+  // UI fallback only. Real production risk must come from the notebook's saved model API.
+  function localEstimate(p) {
+    let score = 24;
+    if (p.Contract === 'Month-to-month') score += 22;
+    if (p.tenure <= 6) score += 19; else if (p.tenure >= 36) score -= 14;
+    if (p.MonthlyCharges >= 70) score += 13;
+    if (p.PaymentMethod === 'Electronic check') score += 9;
+    if (p.PaperlessBilling === 'Yes') score += 4;
+    if (p.OnlineSecurity === 'No') score += 7;
+    if (p.TechSupport === 'No') score += 8;
+    if (p.OnlineBackup === 'No') score += 4;
+    if (p.DeviceProtection === 'No') score += 4;
+    if (p.Contract === 'Two year') score -= 20;
+    return Math.max(4, Math.min(96, score));
+  }
+
+  function render(score, p, source) {
+    const rounded = Math.round(score);
+    const riskValue = document.getElementById('riskValue');
+    const label = document.getElementById('riskLabel');
+    const fill = document.getElementById('gaugeFill');
+    const factorList = document.getElementById('factorList');
+    riskValue.textContent = rounded + '%';
+    const high = rounded >= 65, medium = rounded >= 35 && rounded < 65;
+    label.textContent = high ? 'High churn risk' : medium ? 'Moderate churn risk' : 'Low churn risk';
+    const color = high ? '#ff7b7b' : medium ? '#fbbf24' : '#5eead4';
+    fill.style.borderTopColor = color; fill.style.borderRightColor = color;
+    fill.style.transform = `rotate(${45 + (rounded / 100) * 180}deg)`;
+
+    const factors = [];
+    if (p.Contract === 'Month-to-month') factors.push(['Month-to-month contract', 'Higher risk', false]);
+    else factors.push([p.Contract + ' contract', 'Protective', true]);
+    if (p.tenure <= 6) factors.push(['First six months', 'Critical period', false]);
+    else if (p.tenure >= 36) factors.push(['Long tenure', 'Protective', true]);
+    if (p.MonthlyCharges >= 70) factors.push(['Charges above $70', 'Higher risk', false]);
+    if (p.TechSupport === 'No') factors.push(['No tech support', 'Higher risk', false]);
+    if (p.OnlineSecurity === 'Yes') factors.push(['Online security active', 'Protective', true]);
+    factorList.innerHTML = factors.slice(0, 4).map(([name, tag, good]) => `<div class="factor"><span>${name}</span><span class="tag ${good ? 'good' : ''}">${tag}</span></div>`).join('') || '<div class="factor"><span>Balanced customer profile</span><span class="tag good">Stable</span></div>';
+
+    document.getElementById('actionTitle').textContent = high ? 'Priority retention outreach' : medium ? 'Proactive service check-in' : 'Maintain customer experience';
+    document.getElementById('actionText').textContent = high
+      ? 'Offer a support-led retention package, review monthly cost, and discuss a longer contract option.'
+      : medium ? 'Confirm service satisfaction and promote online security, backup, device protection, or technical support where relevant.'
+      : 'Continue reliable service and use a loyalty offer near the next contract milestone.';
+    document.getElementById('apiStatus').innerHTML = source === 'api' ? 'Prediction source: <strong>live model API</strong>.' : 'Prediction source: <strong>local interface demo</strong>. Connect the saved model through <code>/predict</code> for production results.';
+    const toast = document.getElementById('toast'); toast.classList.add('show'); setTimeout(() => toast.classList.remove('show'), 1900);
+  }
+
+  form.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const payload = getPayload();
+    try {
+      const response = await fetch('/predict', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+      if (!response.ok) throw new Error('API unavailable');
+      const result = await response.json();
+      const probability = result.churn_probability ?? result.probability ?? (result.prediction === 1 ? 0.75 : 0.25);
+      render(Number(probability) <= 1 ? Number(probability) * 100 : Number(probability), payload, 'api');
+    } catch (error) {
+      render(localEstimate(payload), payload, 'demo');
+    }
+  });
+
+  form.addEventListener('reset', () => setTimeout(() => {
+    tenureRange.value = 12;
+    document.getElementById('riskValue').textContent = '--';
+    document.getElementById('riskLabel').textContent = 'Enter customer details';
+    document.getElementById('factorList').innerHTML = '<div class="factor"><span>No prediction yet</span><span class="tag good">Waiting</span></div>';
+    document.getElementById('actionTitle').textContent = 'Retention action';
+    document.getElementById('actionText').textContent = 'A recommended next step will appear after prediction.';
+  }, 0));
+</script>
+</body>
+</html>
