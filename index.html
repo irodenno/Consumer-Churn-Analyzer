@@ -347,7 +347,7 @@
     event.preventDefault();
     const payload = getPayload();
     try {
-      const response = await fetch('http://127.0.0.1:8000/predict', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+      const response = await fetch('https://telecomchurn-abbb.onrender.com/predict', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
       if (!response.ok) throw new Error('API unavailable');
       const result = await response.json();
       const probability = result.churn_probability ?? result.probability ?? (result.prediction === 1 ? 0.75 : 0.25);
