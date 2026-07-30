@@ -145,10 +145,7 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://127.0.0.1:5500",
-        "http://localhost:5500",
-    ],
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["GET", "POST"],
     allow_headers=["*"],
@@ -175,6 +172,7 @@ def health():
 
 @app.post("/predict")
 def predict(customer: CustomerInput):
+    print(customer)
     if model is None:
         raise HTTPException(status_code=503, detail="Model is not loaded.")
 
@@ -186,7 +184,7 @@ def predict(customer: CustomerInput):
         if hasattr(model, "predict_proba"):
             probability = float(model.predict_proba(features)[0][1])
 
-        return {
+        prediction =  {
             "prediction": prediction,
             "churn": bool(prediction),
             "label": (
@@ -201,6 +199,10 @@ def predict(customer: CustomerInput):
                 round(probability * 100, 2) if probability is not None else None
             ),
         }
+
+        print(prediction)
+
+        return prediction
 
     except ValueError as error:
         raise HTTPException(status_code=422, detail=str(error)) from error
